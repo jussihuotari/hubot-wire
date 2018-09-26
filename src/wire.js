@@ -46,25 +46,41 @@ const initEventListeners = (account) => {
 }
 // login :: apiclient -> config -> Promise Context
 const login = (account, loginData) => account.login(loginData)
+// queryWireUser :: Object -> Promise HubotUser
+const queryWireUser = (data) => {
+  const { from: uid, conversation: room } = data
+  const wireUserPromise = wire.client.user.api.getUser(uid)
+  const hubotUserPromise = wireUserPromise.then(wireUser => {
+    logger.log(`Queried Wire user data for uid ${uid}: ${wireUser.name}`)
+    const hubotUser = wire.adapter.robot.brain.userForId(uid, {
+      name: wireUser.name,
+      alias: wireUser.handle,
+      room: room
+    })
+    return Promise.resolve(hubotUser)
+  })
+  return hubotUserPromise
+}
 
 // -- Handle messages ---------------------------------------------------------
-// Convert Wire uid to Hubot User
-const wireToUser = (data) => {
-  // Destructuring required params
-  const { from: uid, conversation: room } = data
-  const user = wire.adapter.robot.brain.userForId(uid, {
-    name: 'Hard Coded',
-    alias: 'Hard',
-    room: room
-  })
-  return user
+// Convert Wire uid to Hubot User Promise
+const wireUidToUser = (data) => {
+  // Destructuring params
+  const { from: uid } = data
+  const brain = wire.adapter.robot.brain
+  return brain.users().hasOwnProperty(uid)
+    ? Promise.resolve(brain.userForId(uid)) : queryWireUser(data)
 }
 // Convert Wire payload to Hubot Message
-// wireToMessage :: Object -> Object
+// wireToMessage :: Object -> Promise Object
 const wireToMessage = (data) => {
   const { conversation: conversationId, content, from, id: messageId, type } = data
-  const msg = new TextMessage(wireToUser(data), content.text, messageId)
-  return msg
+  const hubotUserPromise = wireUidToUser(data)
+  return hubotUserPromise.then(hUser => {
+    const msg = new TextMessage(hUser, content.text, messageId)
+    logger.log('Converted incoming Wire to a Hubot message')
+    return Promise.resolve(msg)
+  })
 }
 const createConfirmation = (messageId) => wire.account.service.conversation.createConfirmation(messageId)
 const handleConfirmation = (data) => logger.log(`Got confirmation for msg id ${data.content.confirmMessageId}`)
@@ -72,19 +88,19 @@ const handleReadUpdate = (data) => logger.log(`Last read message ${data.messageI
 const handleText = (data) => {
   const { conversation: conversationId, content, from, id: messageId, type } = data
   logger.info(`Received "${type}" ("${messageId}") in "${conversationId}" from "${from}": ${content.text}`)
-  logger.warn(JSON.stringify(content))
   const confirmationPayload = createConfirmation(messageId)
   wire.account.service.conversation.send(conversationId, confirmationPayload)
     .then(val => infolog('Sent confirmation', val))
-    .then(val => wire.adapter.receive(wireToMessage(data)))
+    .then(val => wireToMessage(data))
+    .then(val => wire.adapter.receive(val))
     .catch(e => logger.error('Error', e))
 }
 
-// -- Setup and listen --------------------------------------------------------
+// -- Set up and listen --------------------------------------------------------
 // https://github.com/hubotio/hubot/blob/master/src/adapter.js
 class Wire extends Adapter {
   send (envelope, ...strings) {
-    logger.warn(`Send ${JSON.stringify(envelope)}, ${strings}`)
+    logger.info(`Send ${JSON.stringify(envelope)}, ${strings}`)
     const textPayload = wire.account.service.conversation.createText(strings[0]).build()
     wire.account.service.conversation.send(envelope.room, textPayload)
       .then(val => logger.log(`Sent text with id ${val.id}`))
