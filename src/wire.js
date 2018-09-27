@@ -1,5 +1,7 @@
 require('dotenv').config()
 
+const R = require('ramda')
+
 const Adapter = require('hubot/src/adapter')
 const TextMessage = require('hubot/src/message').TextMessage
 
@@ -109,6 +111,8 @@ const handleText = (data) => {
 class Wire extends Adapter {
   send (envelope, ...strings) {
     logger.info(`Send ${JSON.stringify(envelope)}, ${strings}`)
+    // TODO build asset messages for e.g. images
+    // const links = R.filter(R.startsWith('_asset'), strings)
     const textPayload = wire.account.service.conversation.createText(strings[0]).build()
     wire.account.service.conversation.send(envelope.room, textPayload)
       .then(val => logger.log(`Sent text with id ${val.id}`))

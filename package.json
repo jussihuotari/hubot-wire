@@ -20,8 +20,8 @@
     "@wireapp/api-client": "^1.15.22",
     "@wireapp/core": "^6.3.10",
     "dotenv": "^6.0.0",
-    "hubot": "3",
-    "logdown": "^3.2.7"
+    "logdown": "^3.2.7",
+    "ramda": "^0.25.0"
   },
   "devDependencies": {
     "eslint": "^5.6.0",
