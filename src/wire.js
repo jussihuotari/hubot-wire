@@ -80,8 +80,9 @@ const wireUidToUser = (data) => {
   // Destructuring params
   const { conversation: room, from: uid } = data
   const brain = wire.adapter.robot.brain
-  return brain.users().hasOwnProperty(R.concat(room, uid))
-    ? Promise.resolve(brain.userForId(uid)) : queryWireUser(room, uid)
+  const hubotUid = R.concat(room, uid)
+  return brain.users().hasOwnProperty(hubotUid)
+    ? Promise.resolve(brain.userForId(hubotUid)) : queryWireUser(room, uid)
 }
 // Convert Wire payload to Hubot Message
 // wireToMessage :: Object -> Promise Object
