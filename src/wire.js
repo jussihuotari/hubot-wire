@@ -1,6 +1,7 @@
 require('dotenv').config()
 
 const R = require('ramda')
+const pprompt = require('password-prompt')
 
 const Adapter = require('hubot/src/adapter')
 const TextMessage = require('hubot/src/message').TextMessage
@@ -20,7 +21,7 @@ const wire = {
   loginData: {
     clientType: ClientType.PERMANENT,
     email: process.env.WIRE_EMAIL,
-    password: process.env.WIRE_PASSWORD
+    password: null
   }
 }
 
@@ -29,14 +30,20 @@ const infolog = (str, value) => {
   logger.info(str)
   return value
 }
-const setupGlobals = (engine, adapter, result) => {
+const getWirePassword = () => {
+  return process.env.WIRE_PASSWORD === undefined
+    ? pprompt('Password: ')
+    : Promise.resolve(process.env.WIRE_PASSWORD)
+}
+const setupGlobals = (engine, adapter, password) => {
+  wire.loginData.password = password
   wire.client = new APIClient({ store: engine, urls: APIClient.BACKEND.PRODUCTION })
   wire.account = new Account(wire.client)
   wire.adapter = adapter
   logger.log('Wire client object built')
   initEventListeners(wire.account)
   logger.log('Wire event handlers set')
-  return result
+  return password
 }
 // initEngine :: _ -> Promise
 const initEngine = (engine) => engine.init('hubot-wire')
@@ -97,10 +104,9 @@ const handleConfirmation = (data) => logger.log(`Got confirmation for msg id ${d
 const handleReadUpdate = (data) => logger.log(`Last read message ${data.messageId}`)
 const handleText = (data) => {
   const { conversation: conversationId, content, from, id: messageId, type } = data
-  logger.info(`Received "${type}" ("${messageId}") in "${conversationId}" from "${from}": ${content.text}`)
+  logger.log(`Received "${type}" ("${messageId}") in "${conversationId}" from "${from}": ${content.text}`)
   const confirmationPayload = createConfirmation(messageId)
   wire.account.service.conversation.send(conversationId, confirmationPayload)
-    .then(val => infolog('Sent confirmation', val))
     .then(val => wireToMessage(data))
     .then(val => wire.adapter.receive(val))
     .catch(e => logger.error('Error', e))
@@ -139,7 +145,8 @@ class Wire extends Adapter {
     this.robot.logger.info('robot Starting')
     initEngine(wire.engine)
       .then(val => infolog(`Initialized FileEngine, store name ${val}`, val))
-      .then(val => setupGlobals(wire.engine, this, val))
+      .then(val => getWirePassword())
+      .then(password => setupGlobals(wire.engine, this, password))
       .then(val => login(wire.account, wire.loginData))
       .then(val => infolog(`Logged in as ${val.userId}, client ${val.clientId}`, val))
       .then(val => wire.account.listen())

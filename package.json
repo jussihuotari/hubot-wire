@@ -21,6 +21,7 @@
     "@wireapp/core": "^6.3.10",
     "dotenv": "^6.0.0",
     "logdown": "^3.2.7",
+    "password-prompt": "^1.0.7",
     "ramda": "^0.25.0"
   },
   "devDependencies": {
