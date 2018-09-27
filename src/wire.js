@@ -43,6 +43,10 @@ const initEventListeners = (account) => {
   return account.on(PayloadBundleType.CONFIRMATION, handleConfirmation)
     .on(PayloadBundleType.TEXT, handleText)
     .on(PayloadBundleType.LAST_READ_UPDATE, handleReadUpdate)
+    .on(PayloadBundleType.ASSET, sendConfirmation)
+    .on(PayloadBundleType.ASSET_IMAGE, sendConfirmation)
+    .on(PayloadBundleType.LOCATION, sendConfirmation)
+    .on(PayloadBundleType.PING, sendConfirmation)
 }
 // login :: apiclient -> config -> Promise Context
 const login = (account, loginData) => account.login(loginData)
@@ -74,7 +78,7 @@ const wireUidToUser = (data) => {
 // Convert Wire payload to Hubot Message
 // wireToMessage :: Object -> Promise Object
 const wireToMessage = (data) => {
-  const { conversation: conversationId, content, from, id: messageId, type } = data
+  const { content, id: messageId } = data
   const hubotUserPromise = wireUidToUser(data)
   return hubotUserPromise.then(hUser => {
     const msg = new TextMessage(hUser, content.text, messageId)
@@ -83,6 +87,10 @@ const wireToMessage = (data) => {
   })
 }
 const createConfirmation = (messageId) => wire.account.service.conversation.createConfirmation(messageId)
+const sendConfirmation = (data) => {
+  logger.log(`Send receipt confirmation for ${data.type} id ${data.id}`)
+  return wire.account.service.conversation.createConfirmation(data.id)
+}
 const handleConfirmation = (data) => logger.log(`Got confirmation for msg id ${data.content.confirmMessageId}`)
 const handleReadUpdate = (data) => logger.log(`Last read message ${data.messageId}`)
 const handleText = (data) => {
