@@ -60,12 +60,11 @@ const initEventListeners = (account) => {
 // login :: apiclient -> config -> Promise Context
 const login = (account, loginData) => account.login(loginData)
 // queryWireUser :: Object -> Promise HubotUser
-const queryWireUser = (data) => {
-  const { from: uid, conversation: room } = data
+const queryWireUser = (room, uid) => {
   const wireUserPromise = wire.client.user.api.getUser(uid)
   const hubotUserPromise = wireUserPromise.then(wireUser => {
     logger.log(`Queried Wire user data for uid ${uid}: ${wireUser.name}`)
-    const hubotUser = wire.adapter.robot.brain.userForId(uid, {
+    const hubotUser = wire.adapter.robot.brain.userForId(R.concat(room, uid), {
       name: wireUser.name,
       alias: wireUser.handle,
       room: room
@@ -79,10 +78,10 @@ const queryWireUser = (data) => {
 // Convert Wire uid to Hubot User Promise
 const wireUidToUser = (data) => {
   // Destructuring params
-  const { from: uid } = data
+  const { conversation: room, from: uid } = data
   const brain = wire.adapter.robot.brain
-  return brain.users().hasOwnProperty(uid)
-    ? Promise.resolve(brain.userForId(uid)) : queryWireUser(data)
+  return brain.users().hasOwnProperty(R.concat(room, uid))
+    ? Promise.resolve(brain.userForId(uid)) : queryWireUser(room, uid)
 }
 // Convert Wire payload to Hubot Message
 // wireToMessage :: Object -> Promise Object
